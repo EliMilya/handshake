@@ -1,0 +1,89 @@
+🤝 Handshake — Hackathon Project Brief
+A deal isn't a deal until someone puts their hand out.
+
+What You're Building
+Handshake is a micro-contract app. Two people negotiate the terms of anything — a bet, a split, a dare, a pact — in a real-time shared thread. They propose, edit, argue. When both parties are satisfied, they simultaneously hold a button for 3 seconds.
+
+It seals. Forever.
+
+The contract lives at a permanent URL. Immutable. No takebacks. No edits. Just two names, a timestamp, and the terms you agreed to. No legal weight — pure social weight.
+
+Core User Flow
+Create contract → Share link → Negotiate in real-time → Both hold to seal → Permanent URL
+User A creates a contract and writes the first draft of terms
+User A shares the link with User B
+Both parties can propose edits — each edit is a new entry in the negotiation log
+When both are happy, they each hold the Seal button for 3 seconds simultaneously
+The contract freezes. A permanent, shareable, read-only page is generated.
+The Interesting Engineering Problems
+These are the bits worth thinking about — not "how do I render a button", but the actual meaty decisions:
+
+The simultaneous hold mechanic — both users must hold for 3 seconds at the same time. How do you sync that state? What's the UX if one person lets go? What's the timeout window?
+True immutability — once sealed, no Convex mutation should ever touch that document again. Enforce this at the data layer, not just the UI.
+The negotiation log — each proposed edit should be attributed and timestamped. Think append-only. Think audit trail.
+Access control — only the two named signatories can edit. Anyone with the link can view. How do you model that cleanly with Clerk identities?
+Technical Stack
+Layer	Tool
+Frontend	React + Vite
+UI Components	shadcn/ui
+Database / Backend	Convex
+Auth	Clerk
+Hosting	Vercel (deploy from GitHub)
+Language	TypeScript throughout
+Why this stack makes sense for this app
+Convex handles the real-time negotiation sync without you writing a single WebSocket. Reactive queries mean both parties see edits instantly. Convex mutations give you transactional guarantees for the seal event.
+Clerk gives each contract two verified identities — no anonymous seals.
+Vercel + GitHub means you can ship from your terminal with git push. No ops, no config.
+Suggested Convex Schema
+// contracts
+{
+  id: Id<"contracts">,
+  status: "negotiating" | "sealed",
+  creatorId: string,          // Clerk user ID
+  counterpartyId: string | null,
+  terms: string,              // current working draft
+  sealedAt: number | null,
+  sealedTerms: string | null, // frozen copy at seal time
+}
+
+// negotiation_log
+{
+  contractId: Id<"contracts">,
+  authorId: string,
+  proposedTerms: string,
+  createdAt: number,
+}
+
+// seal_intent
+{
+  contractId: Id<"contracts">,
+  userId: string,
+  holdStartedAt: number,
+}
+Suggested Component Structure but not a strict requirement!
+src/
+├── pages/
+│   ├── Home.tsx           # Create a contract or enter a code
+│   ├── Contract.tsx       # The main negotiation view
+│   └── Sealed.tsx         # The permanent read-only receipt
+├── components/
+│   ├── TermsEditor.tsx    # Editable textarea with propose button
+│   ├── NegotiationLog.tsx # Append-only thread of proposed edits
+│   ├── SealButton.tsx     # The hold-to-seal mechanic ← most interesting
+│   └── ContractReceipt.tsx # The final sealed view
+└── convex/
+    ├── contracts.ts
+    ├── negotiation.ts
+    └── seal.ts
+MVP Scope (aim for this)
+ Create a contract and get a shareable link
+ Real-time term editing visible to both parties
+ Negotiation log showing who proposed what
+ Hold-to-seal mechanic (both must hold simultaneously)
+ Sealed contracts are read-only and permanent
+ Clerk auth gates editing to the two signatories
+Stretch Goals (if you're flying)
+ Contract expiry — unsealed contracts self-destruct after 24h
+ Witness mode — a third party can observe but not edit
+ Contract gallery — a public feed of (opted-in) sealed deals
+ Share card — an OG image generated for the sealed URL
